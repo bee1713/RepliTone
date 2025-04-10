@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,7 +132,8 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
       const synth = window.speechSynthesis;
       
       // Create audio context and processor to capture audio
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass();
       const destination = audioContext.createMediaStreamDestination();
       const mediaRecorder = new MediaRecorder(destination.stream);
       const audioChunks: Blob[] = [];
