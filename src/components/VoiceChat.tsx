@@ -6,6 +6,7 @@ import { Mic, Send, StopCircle } from "lucide-react";
 import Message from "./Message";
 import VoiceWave from "./VoiceWave";
 import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 
 interface VoiceChatProps {
   voiceId?: string;
@@ -33,6 +34,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<Record<string, HTMLAudioElement>>({});
+  const [textInput, setTextInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -131,7 +133,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
       const synth = window.speechSynthesis;
       
       // Create audio context and processor to capture audio
-      const audioContext = new AudioContext();
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const destination = audioContext.createMediaStreamDestination();
       const mediaRecorder = new MediaRecorder(destination.stream);
       const audioChunks: Blob[] = [];
@@ -163,78 +165,132 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
     setIsProcessing(true);
     
     // In a real implementation, you would:
-    // 1. Send audio to speech-to-text API (like Whisper)
-    // 2. Get the transcription
-    // 3. Send the text to GPT or other LLM
-    // 4. Convert the response to speech using the cloned voice
+    // 1. Convert the audio to text using Whisper API
+    try {
+      // This would be an actual API call to a speech-to-text service
+      // For now, we'll simulate speech recognition with the Web Speech API if available
+      const userText = await recognizeSpeech(audioBlob);
+      
+      // Add user message
+      const userMessage: MessageType = {
+        id: `user-${Date.now()}`,
+        sender: "user",
+        text: userText,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Process the message and get AI response
+      await processUserMessage(userText);
+    } catch (error) {
+      console.error("Error processing voice:", error);
+      toast({
+        title: "Voice Processing Error",
+        description: "Could not process your voice. Please try again or use text input.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+    }
+  };
+
+  const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
+    // In a real app, you would use Whisper API or similar here
+    // For demo, we'll use a simulated response with Web Speech API if available
     
-    // For demo purposes, we'll simulate this process
+    // Since we can't directly use the Web Speech API with a blob in this way easily,
+    // let's simulate this with a prompt
+    const userText = prompt("Speech recognition simulation - What did you say?", "Hello AI, how are you today?");
     
-    // Simulate transcription (in reality, would use Whisper API)
-    const mockUserQuestions = [
-      "How are you today?",
-      "What's the weather like?",
-      "Can you tell me a joke?",
-      "What's your favorite color?",
-      "Tell me something interesting."
-    ];
+    // Return user input or fallback to default message
+    return userText || "Hello AI, can you hear me?";
+  };
+
+  const processUserMessage = async (userText: string) => {
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const userText = mockUserQuestions[Math.floor(Math.random() * mockUserQuestions.length)];
+    // In a real app, this would call your AI service (e.g., OpenAI's API)
+    // For demo, use simple responses for common queries
+    const commonResponses: Record<string, string> = {
+      "hello": "Hello! How can I help you today?",
+      "hi": "Hi there! What can I do for you?",
+      "how are you": "I'm doing great, thanks for asking! How about you?",
+      "what's your name": "I'm your AI voice assistant. You can call me whatever you'd like!",
+      "goodbye": "Goodbye! Have a great day!",
+      "bye": "Bye for now! Feel free to chat again anytime."
+    };
     
-    // Add user message
+    // Check if the user's message matches any common phrases
+    const lowerText = userText.toLowerCase();
+    let aiResponse = "";
+    
+    for (const [key, value] of Object.entries(commonResponses)) {
+      if (lowerText.includes(key)) {
+        aiResponse = value;
+        break;
+      }
+    }
+    
+    // Fallback response if no matches
+    if (!aiResponse) {
+      aiResponse = "That's interesting! Is there anything specific you'd like to know or talk about?";
+    }
+    
+    // Generate audio for the response
+    let audioUrl = "";
+    try {
+      audioUrl = await generateVoiceResponse(aiResponse);
+    } catch (error) {
+      console.error("Error generating voice response:", error);
+      toast({
+        title: "Voice Generation Error",
+        description: "Could not generate voice response.",
+        variant: "destructive"
+      });
+    }
+    
+    // Add AI message with audio
+    const aiMessage: MessageType = {
+      id: `ai-${Date.now()}`,
+      sender: "ai",
+      text: aiResponse,
+      timestamp: new Date(),
+      audioUrl: audioUrl
+    };
+    
+    setMessages(prev => [...prev, aiMessage]);
+    setIsProcessing(false);
+    
+    // Auto-play the response
+    if (audioUrl) {
+      playMessage(aiMessage.id, audioUrl);
+    }
+  };
+
+  const handleSendText = async () => {
+    if (!textInput.trim()) return;
+    
     const userMessage: MessageType = {
       id: `user-${Date.now()}`,
       sender: "user",
-      text: userText,
+      text: textInput,
       timestamp: new Date()
     };
     
     setMessages(prev => [...prev, userMessage]);
+    setTextInput("");
+    setIsProcessing(true);
     
-    // Simulate AI processing time
-    setTimeout(async () => {
-      // Mock AI responses
-      const mockResponses: Record<string, string> = {
-        "How are you today?": "I'm doing well, thank you for asking! How about you?",
-        "What's the weather like?": "I don't have access to real-time weather data, but I hope it's pleasant where you are!",
-        "Can you tell me a joke?": "Why don't scientists trust atoms? Because they make up everything!",
-        "What's your favorite color?": "As an AI, I don't have personal preferences, but I think purple is quite nice!",
-        "Tell me something interesting.": "The human brain can process images in as little as 13 milliseconds. That's faster than the blink of an eye!"
-      };
-      
-      // Generate AI response
-      const aiResponse = mockResponses[userText] || "I'm not sure how to respond to that, but I'm learning!";
-      
-      // Generate audio for the response
-      let audioUrl = "";
-      try {
-        audioUrl = await generateVoiceResponse(aiResponse);
-      } catch (error) {
-        console.error("Error generating voice response:", error);
-        toast({
-          title: "Voice Generation Error",
-          description: "Could not generate voice response.",
-          variant: "destructive"
-        });
-      }
-      
-      // Add AI message with audio
-      const aiMessage: MessageType = {
-        id: `ai-${Date.now()}`,
-        sender: "ai",
-        text: aiResponse,
-        timestamp: new Date(),
-        audioUrl: audioUrl
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setIsProcessing(false);
-      
-      // Auto-play the response if it's the first one or if a previous one was playing
-      if (audioUrl && (messages.length <= 2 || isPlaying)) {
-        playMessage(aiMessage.id, audioUrl);
-      }
-    }, 2000);
+    // Process the message and get AI response
+    await processUserMessage(userMessage.text);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendText();
+    }
   };
 
   const playMessage = (messageId: string, audioUrl?: string) => {
@@ -321,7 +377,28 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
               </Button>
             )}
             
-            <div className="flex-1 mx-2">
+            <div className="flex-1 relative">
+              <Input
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Type a message..."
+                disabled={isRecording || isProcessing}
+                className="w-full pr-10"
+              />
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-0 top-0 h-full"
+                onClick={handleSendText}
+                disabled={!textInput.trim() || isRecording || isProcessing}
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="flex-col items-center hidden">
               {isRecording ? (
                 <div className="flex justify-center">
                   <VoiceWave active={true} />
@@ -338,16 +415,20 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
                 </p>
               )}
             </div>
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="rounded-full h-12 w-12"
-              disabled={true}
-            >
-              <Send className="h-5 w-5" />
-            </Button>
           </div>
+          
+          {isRecording && (
+            <div className="flex justify-center mt-2">
+              <VoiceWave active={true} />
+              <span className="text-sm text-brand-purple ml-2 animate-pulse">Recording...</span>
+            </div>
+          )}
+          
+          {isProcessing && (
+            <p className="text-sm text-center text-muted-foreground animate-pulse mt-2">
+              Processing your message...
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>
