@@ -16,6 +16,7 @@ interface MessageType {
   sender: "user" | "ai";
   text: string;
   timestamp: Date;
+  audioUrl?: string;
 }
 
 const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
@@ -31,6 +32,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [audioElements, setAudioElements] = useState<Record<string, HTMLAudioElement>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -80,6 +82,83 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
     }
   };
 
+  const generateVoiceResponse = async (text: string): Promise<string> => {
+    // In a real app, this would make an API call to ElevenLabs or another TTS service
+    // For this demo, we'll simulate this with predefined audio
+    
+    // Simulate voice generation delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Here, we would use the voiceId to select the appropriate cloned voice
+    // For the demo, just simulate with a basic browser TTS
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // If we had a real voice service, we'd use the voiceId here
+    // This is just a placeholder behavior
+    if (voiceId) {
+      // In a real app with ElevenLabs API:
+      // const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'xi-api-key': 'your-api-key'
+      //   },
+      //   body: JSON.stringify({
+      //     text: text,
+      //     model_id: "eleven_multilingual_v2",
+      //     voice_settings: {
+      //       stability: 0.5,
+      //       similarity_boost: 0.75
+      //     }
+      //   })
+      // });
+      // const audioBlob = await response.blob();
+      // const url = URL.createObjectURL(audioBlob);
+      // return url;
+      
+      // For demo, use browser voice synthesis
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        // Try to use a female voice for variety
+        const femaleVoice = voices.find(voice => voice.name.includes('female'));
+        utterance.voice = femaleVoice || voices[0];
+      }
+    }
+    
+    // Create a promise to capture audio
+    return new Promise((resolve) => {
+      // For demo purposes, use the browser's SpeechSynthesis API
+      const synth = window.speechSynthesis;
+      
+      // Create audio context and processor to capture audio
+      const audioContext = new AudioContext();
+      const destination = audioContext.createMediaStreamDestination();
+      const mediaRecorder = new MediaRecorder(destination.stream);
+      const audioChunks: Blob[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        resolve(audioUrl);
+      };
+      
+      // Start recording
+      mediaRecorder.start();
+      
+      // Use the utterance
+      utterance.onend = () => {
+        mediaRecorder.stop();
+        audioContext.close();
+      };
+      
+      synth.speak(utterance);
+    });
+  };
+
   const processVoiceInput = async (audioBlob: Blob) => {
     setIsProcessing(true);
     
@@ -113,7 +192,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
     setMessages(prev => [...prev, userMessage]);
     
     // Simulate AI processing time
-    setTimeout(() => {
+    setTimeout(async () => {
       // Mock AI responses
       const mockResponses: Record<string, string> = {
         "How are you today?": "I'm doing well, thank you for asking! How about you?",
@@ -126,30 +205,74 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
       // Generate AI response
       const aiResponse = mockResponses[userText] || "I'm not sure how to respond to that, but I'm learning!";
       
-      // Add AI message
+      // Generate audio for the response
+      let audioUrl = "";
+      try {
+        audioUrl = await generateVoiceResponse(aiResponse);
+      } catch (error) {
+        console.error("Error generating voice response:", error);
+        toast({
+          title: "Voice Generation Error",
+          description: "Could not generate voice response.",
+          variant: "destructive"
+        });
+      }
+      
+      // Add AI message with audio
       const aiMessage: MessageType = {
         id: `ai-${Date.now()}`,
         sender: "ai",
         text: aiResponse,
-        timestamp: new Date()
+        timestamp: new Date(),
+        audioUrl: audioUrl
       };
       
       setMessages(prev => [...prev, aiMessage]);
       setIsProcessing(false);
       
-      // In a real app, you would now generate speech from this text using the cloned voice
-      // And play it back to the user
+      // Auto-play the response if it's the first one or if a previous one was playing
+      if (audioUrl && (messages.length <= 2 || isPlaying)) {
+        playMessage(aiMessage.id, audioUrl);
+      }
     }, 2000);
   };
 
-  const playMessage = (messageId: string) => {
+  const playMessage = (messageId: string, audioUrl?: string) => {
+    if (!audioUrl) {
+      const message = messages.find(m => m.id === messageId);
+      if (!message?.audioUrl) return;
+      audioUrl = message.audioUrl;
+    }
+    
+    // Stop any currently playing audio
+    if (isPlaying) {
+      const currentAudio = audioElements[isPlaying];
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+    }
+    
+    // Play the new audio
+    let audio = audioElements[messageId];
+    if (!audio) {
+      audio = new Audio(audioUrl);
+      setAudioElements(prev => ({
+        ...prev,
+        [messageId]: audio
+      }));
+    }
+    
     setIsPlaying(messageId);
     
-    // In a real implementation, this would play the TTS audio
-    // For demo, we'll simulate with a timeout
-    setTimeout(() => {
+    audio.onended = () => {
       setIsPlaying(null);
-    }, 3000);
+    };
+    
+    audio.play().catch(error => {
+      console.error("Error playing audio:", error);
+      setIsPlaying(null);
+    });
   };
 
   return (
@@ -170,7 +293,7 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
               text={message.text}
               timestamp={message.timestamp}
               isPlaying={isPlaying === message.id}
-              onPlay={() => message.sender === "ai" && playMessage(message.id)}
+              onPlay={() => message.sender === "ai" && message.audioUrl && playMessage(message.id)}
             />
           ))}
           <div ref={messagesEndRef} />
