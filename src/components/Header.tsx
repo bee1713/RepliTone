@@ -1,6 +1,6 @@
 
 import React from "react";
-import { GitHub } from "lucide-react";
+import { Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Header = () => {
@@ -16,7 +16,7 @@ const Header = () => {
         
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="hidden md:flex gap-2 items-center">
-            <GitHub className="h-4 w-4" />
+            <Github className="h-4 w-4" />
             <span>GitHub</span>
           </Button>
         </div>
