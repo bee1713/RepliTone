@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,9 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
   const [textInput, setTextInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const [conversationHistory, setConversationHistory] = useState<{role: string, content: string}[]>([
+    { role: "system", content: "You are a helpful AI assistant with a friendly, conversational style. Respond directly to questions and provide thoughtful answers. Never repeat the same response twice." }
+  ]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -84,92 +88,107 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
   };
 
   const generateVoiceResponse = async (text: string): Promise<string> => {
-    // In a real app, this would make an API call to ElevenLabs or another TTS service
-    // For this demo, we'll simulate this with predefined audio
+    // In a real implementation, this would make an API call to ElevenLabs or similar TTS service
+    console.log("Generating voice response for:", text);
+    console.log("Using voice ID:", voiceId);
     
-    // Simulate voice generation delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Here, we would use the voiceId to select the appropriate cloned voice
-    // For the demo, just simulate with a basic browser TTS
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // If we had a real voice service, we'd use the voiceId here
-    // This is just a placeholder behavior
-    if (voiceId) {
-      // In a real app with ElevenLabs API:
-      // const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'xi-api-key': 'your-api-key'
-      //   },
-      //   body: JSON.stringify({
-      //     text: text,
-      //     model_id: "eleven_multilingual_v2",
-      //     voice_settings: {
-      //       stability: 0.5,
-      //       similarity_boost: 0.75
-      //     }
-      //   })
-      // });
-      // const audioBlob = await response.blob();
-      // const url = URL.createObjectURL(audioBlob);
-      // return url;
+    try {
+      // Simulate API call to ElevenLabs or similar service
+      // In a real implementation, this would be:
+      /*
+      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'xi-api-key': 'your-api-key'
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        })
+      });
       
-      // For demo, use browser voice synthesis
+      if (!response.ok) {
+        throw new Error(`Error generating voice: ${response.statusText}`);
+      }
+      
+      const audioBlob = await response.blob();
+      return URL.createObjectURL(audioBlob);
+      */
+      
+      // For demo purposes, use the browser's SpeechSynthesis API
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Try to use a variety of voices for a better demo experience
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
-        // Try to use a female voice for variety
-        const femaleVoice = voices.find(voice => voice.name.includes('female'));
-        utterance.voice = femaleVoice || voices[0];
+        // Try to simulate the effect of using different voices based on voiceId
+        if (voiceId) {
+          // Use voiceId to select a consistent voice (for demo only)
+          const voiceIndex = voiceId.charCodeAt(0) % voices.length;
+          utterance.voice = voices[voiceIndex];
+        } else {
+          // Use a default voice
+          utterance.voice = voices[0];
+        }
       }
+      
+      // Create a promise to capture the audio
+      return new Promise((resolve) => {
+        // Create audio context and processor to capture audio
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        const audioContext = new AudioContext();
+        const destination = audioContext.createMediaStreamDestination();
+        const mediaRecorder = new MediaRecorder(destination.stream);
+        const audioChunks: Blob[] = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          resolve(audioUrl);
+        };
+        
+        // Start recording
+        mediaRecorder.start();
+        
+        // Use the utterance
+        utterance.onend = () => {
+          mediaRecorder.stop();
+          audioContext.close();
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      });
+    } catch (error) {
+      console.error("Error generating voice response:", error);
+      toast({
+        title: "Voice Generation Error",
+        description: "Could not generate voice response. Using text only.",
+        variant: "destructive"
+      });
+      return "";
     }
-    
-    // Create a promise to capture audio
-    return new Promise((resolve) => {
-      // For demo purposes, use the browser's SpeechSynthesis API
-      const synth = window.speechSynthesis;
-      
-      // Create audio context and processor to capture audio
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioContext = new AudioContextClass();
-      const destination = audioContext.createMediaStreamDestination();
-      const mediaRecorder = new MediaRecorder(destination.stream);
-      const audioChunks: Blob[] = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunks.push(event.data);
-      };
-      
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        resolve(audioUrl);
-      };
-      
-      // Start recording
-      mediaRecorder.start();
-      
-      // Use the utterance
-      utterance.onend = () => {
-        mediaRecorder.stop();
-        audioContext.close();
-      };
-      
-      synth.speak(utterance);
-    });
   };
 
   const processVoiceInput = async (audioBlob: Blob) => {
     setIsProcessing(true);
     
-    // In a real implementation, you would:
-    // 1. Convert the audio to text using Whisper API
     try {
-      // This would be an actual API call to a speech-to-text service
-      // For now, we'll simulate speech recognition with the Web Speech API if available
+      // In a real implementation, this would call Whisper API or similar for STT
+      // For now, we'll use Web Speech API if available, otherwise simulate
       const userText = await recognizeSpeech(audioBlob);
+      
+      if (!userText) {
+        throw new Error("No speech detected");
+      }
       
       // Add user message
       const userMessage: MessageType = {
@@ -180,6 +199,12 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
       };
       
       setMessages(prev => [...prev, userMessage]);
+      
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: "user", content: userText }
+      ]);
       
       // Process the message and get AI response
       await processUserMessage(userText);
@@ -196,75 +221,140 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
 
   const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
     // In a real app, you would use Whisper API or similar here
-    // For demo, we'll use a simulated response with Web Speech API if available
-    
-    // Since we can't directly use the Web Speech API with a blob in this way easily,
-    // let's simulate this with a prompt
-    const userText = prompt("Speech recognition simulation - What did you say?", "Hello AI, how are you today?");
-    
-    // Return user input or fallback to default message
-    return userText || "Hello AI, can you hear me?";
+    // For demo and to ensure we handle real input, use a prompt
+    return new Promise((resolve) => {
+      // Simulating speech recognition
+      console.log("Processing speech recognition...");
+      
+      // In a real app with Whisper API:
+      /*
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.webm');
+      formData.append('model', 'whisper-1');
+      
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: formData
+      });
+      
+      const result = await response.json();
+      return result.text;
+      */
+      
+      // For demo purposes, prompt the user
+      const userInput = prompt("What did you say? (Simulating speech recognition)", "");
+      resolve(userInput || "");
+    });
   };
 
   const processUserMessage = async (userText: string) => {
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // In a real app, this would call your AI service (e.g., OpenAI's API)
-    // For demo, use simple responses for common queries
-    const commonResponses: Record<string, string> = {
-      "hello": "Hello! How can I help you today?",
-      "hi": "Hi there! What can I do for you?",
-      "how are you": "I'm doing great, thanks for asking! How about you?",
-      "what's your name": "I'm your AI voice assistant. You can call me whatever you'd like!",
-      "goodbye": "Goodbye! Have a great day!",
-      "bye": "Bye for now! Feel free to chat again anytime."
-    };
-    
-    // Check if the user's message matches any common phrases
-    const lowerText = userText.toLowerCase();
-    let aiResponse = "";
-    
-    for (const [key, value] of Object.entries(commonResponses)) {
-      if (lowerText.includes(key)) {
-        aiResponse = value;
-        break;
-      }
-    }
-    
-    // Fallback response if no matches
-    if (!aiResponse) {
-      aiResponse = "That's interesting! Is there anything specific you'd like to know or talk about?";
-    }
-    
-    // Generate audio for the response
-    let audioUrl = "";
+    // In a real app, this would call an AI service API
     try {
-      audioUrl = await generateVoiceResponse(aiResponse);
+      console.log("Processing user message:", userText);
+      console.log("Conversation history:", conversationHistory);
+      
+      // For realistic AI responses, you would use:
+      /*
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: conversationHistory,
+          temperature: 0.7,
+          max_tokens: 150
+        })
+      });
+      
+      const result = await response.json();
+      const aiResponse = result.choices[0].message.content;
+      */
+      
+      // Simulate AI processing with more varied responses based on input
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      let aiResponse = "";
+      const lowerText = userText.toLowerCase();
+      
+      if (lowerText.includes("hello") || lowerText.includes("hi")) {
+        aiResponse = "Hello there! How can I assist you today?";
+      } else if (lowerText.includes("how are you")) {
+        aiResponse = "I'm doing well, thanks for asking! How about you?";
+      } else if (lowerText.includes("weather")) {
+        aiResponse = "I don't have real-time weather data, but I'd be happy to chat about other topics!";
+      } else if (lowerText.includes("name")) {
+        aiResponse = "I'm your AI voice assistant. You can call me whatever you'd like!";
+      } else if (lowerText.includes("joke")) {
+        aiResponse = "Why don't scientists trust atoms? Because they make up everything!";
+      } else if (lowerText.includes("thank")) {
+        aiResponse = "You're very welcome! Is there anything else I can help with?";
+      } else if (lowerText.includes("bye") || lowerText.includes("goodbye")) {
+        aiResponse = "Goodbye! Have a wonderful day. Feel free to chat again anytime.";
+      } else {
+        // Generate a variety of responses for generic questions
+        const genericResponses = [
+          "That's an interesting question. Let me think about that...",
+          "I understand what you're asking. Here's what I think...",
+          "Great question! From my perspective...",
+          "I'm glad you asked about that. Here's my take...",
+          "Let me share some thoughts on that topic..."
+        ];
+        
+        aiResponse = genericResponses[Math.floor(Math.random() * genericResponses.length)];
+        aiResponse += " Based on what you're asking, I'd say this is something worth exploring further. What specific aspect interests you most?";
+      }
+      
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: "assistant", content: aiResponse }
+      ]);
+      
+      // Generate audio for the response
+      let audioUrl = "";
+      try {
+        audioUrl = await generateVoiceResponse(aiResponse);
+      } catch (error) {
+        console.error("Error generating voice:", error);
+        toast({
+          title: "Voice Generation Error",
+          description: "Could not generate voice response.",
+          variant: "destructive"
+        });
+      }
+      
+      // Add AI message with audio
+      const aiMessage: MessageType = {
+        id: `ai-${Date.now()}`,
+        sender: "ai",
+        text: aiResponse,
+        timestamp: new Date(),
+        audioUrl: audioUrl
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Auto-play the response if there's audio
+      if (audioUrl) {
+        setTimeout(() => {
+          playMessage(aiMessage.id, audioUrl);
+        }, 300);
+      }
     } catch (error) {
-      console.error("Error generating voice response:", error);
+      console.error("Error processing message:", error);
       toast({
-        title: "Voice Generation Error",
-        description: "Could not generate voice response.",
+        title: "Processing Error",
+        description: "Could not process your message. Please try again.",
         variant: "destructive"
       });
-    }
-    
-    // Add AI message with audio
-    const aiMessage: MessageType = {
-      id: `ai-${Date.now()}`,
-      sender: "ai",
-      text: aiResponse,
-      timestamp: new Date(),
-      audioUrl: audioUrl
-    };
-    
-    setMessages(prev => [...prev, aiMessage]);
-    setIsProcessing(false);
-    
-    // Auto-play the response
-    if (audioUrl) {
-      playMessage(aiMessage.id, audioUrl);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -279,6 +369,13 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
     };
     
     setMessages(prev => [...prev, userMessage]);
+    
+    // Update conversation history
+    setConversationHistory(prev => [
+      ...prev,
+      { role: "user", content: textInput }
+    ]);
+    
     setTextInput("");
     setIsProcessing(true);
     
@@ -294,9 +391,15 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
   };
 
   const playMessage = (messageId: string, audioUrl?: string) => {
+    console.log("Playing audio for message:", messageId);
+    console.log("Audio URL:", audioUrl);
+    
     if (!audioUrl) {
       const message = messages.find(m => m.id === messageId);
-      if (!message?.audioUrl) return;
+      if (!message?.audioUrl) {
+        console.error("No audio URL found for message:", messageId);
+        return;
+      }
       audioUrl = message.audioUrl;
     }
     
@@ -313,6 +416,18 @@ const VoiceChat: React.FC<VoiceChatProps> = ({ voiceId }) => {
     let audio = audioElements[messageId];
     if (!audio) {
       audio = new Audio(audioUrl);
+      
+      // Add error handler for audio
+      audio.onerror = (error) => {
+        console.error("Error playing audio:", error);
+        toast({
+          title: "Audio Playback Error",
+          description: "Could not play audio response.",
+          variant: "destructive"
+        });
+        setIsPlaying(null);
+      };
+      
       setAudioElements(prev => ({
         ...prev,
         [messageId]: audio
