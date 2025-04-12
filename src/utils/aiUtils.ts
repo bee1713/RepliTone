@@ -1,3 +1,4 @@
+
 import { generateVoiceResponse } from './audioUtils';
 
 export interface Message {
@@ -22,33 +23,33 @@ export const processUserMessage = async (
       { role: "user", content: userText }
     ];
     
-    // For demo purposes, simulate an OpenAI call
-    // In production, this would be an actual API call to OpenAI
-    // with proper authentication
     let aiResponse = "";
     let finalHistory = updatedHistory;
     
     try {
-      // Uncomment this in production with proper API key handling
-      // const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${API_KEY}`
-      //   },
-      //   body: JSON.stringify({
-      //     model: 'gpt-4o-mini',
-      //     messages: updatedHistory,
-      //     temperature: 0.7,
-      //     max_tokens: 150
-      //   })
-      // });
-      // 
-      // const result = await response.json();
-      // aiResponse = result.choices[0].message.content;
+      // Call OpenAI API
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY || 'sk-your-key-here'}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: updatedHistory,
+          temperature: 0.7,
+          max_tokens: 500
+        })
+      });
       
-      // For demo, use simulated responses based on input
-      aiResponse = generateSimulatedResponse(userText);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("OpenAI API error:", errorData);
+        throw new Error(`API call failed with status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      aiResponse = result.choices[0].message.content;
       
       // Add AI response to history
       finalHistory = [
@@ -57,7 +58,14 @@ export const processUserMessage = async (
       ];
     } catch (error) {
       console.error("Error calling OpenAI API:", error);
-      aiResponse = "I'm having trouble connecting to my brain right now. Please try again in a moment.";
+      
+      // If API key is missing or invalid, use a specific message
+      if (typeof error === 'object' && error && 'message' in error && 
+          (error.message as string).includes('API key')) {
+        aiResponse = "I need an OpenAI API key to work properly. Please add your API key in the .env file as VITE_OPENAI_API_KEY.";
+      } else {
+        aiResponse = "I'm having trouble connecting to my brain right now. Please check the console for error details and verify your API key is set correctly.";
+      }
       
       // Still add this error response to the conversation history
       finalHistory = [
@@ -77,38 +85,6 @@ export const processUserMessage = async (
   } catch (error) {
     console.error("Error processing message:", error);
     throw new Error("Could not process your message. Please try again.");
-  }
-};
-
-const generateSimulatedResponse = (userText: string): string => {
-  const lowerText = userText.toLowerCase();
-  
-  if (lowerText.includes("hello") || lowerText.includes("hi")) {
-    return "Hello there! How can I assist you today?";
-  } else if (lowerText.includes("how are you")) {
-    return "I'm doing well, thanks for asking! How about you?";
-  } else if (lowerText.includes("weather")) {
-    return "I don't have real-time weather data, but I'd be happy to chat about other topics!";
-  } else if (lowerText.includes("name")) {
-    return "I'm your RepliTone voice assistant. You can call me whatever you'd like!";
-  } else if (lowerText.includes("joke")) {
-    return "Why don't scientists trust atoms? Because they make up everything!";
-  } else if (lowerText.includes("thank")) {
-    return "You're very welcome! Is there anything else I can help with?";
-  } else if (lowerText.includes("bye") || lowerText.includes("goodbye")) {
-    return "Goodbye! Have a wonderful day. Feel free to chat again anytime.";
-  } else {
-    // Generate a variety of responses for generic questions
-    const genericResponses = [
-      "That's an interesting question. Let me think about that...",
-      "I understand what you're asking. Here's what I think...",
-      "Great question! From my perspective...",
-      "I'm glad you asked about that. Here's my take...",
-      "Let me share some thoughts on that topic..."
-    ];
-    
-    const response = genericResponses[Math.floor(Math.random() * genericResponses.length)];
-    return response + " Based on what you're asking, I'd say this is something worth exploring further. What specific aspect interests you most?";
   }
 };
 

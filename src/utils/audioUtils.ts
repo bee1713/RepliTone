@@ -1,3 +1,4 @@
+
 // Define types for Web Speech API to fix TypeScript errors
 interface Window {
   SpeechRecognition: any;
@@ -103,19 +104,10 @@ export const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
         if (transcriptResult) {
           resolve(transcriptResult);
         } else {
-          // Fallback to URL-based audio (e.g., from a blob)
-          const audioURL = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioURL);
-          
-          // Just let the user know we're processing
-          console.log("Processing audio...");
-          
-          // In a real implementation, you would send this audio to Whisper API
-          // For now, we'll use a simulated response after a short delay
-          setTimeout(() => {
-            // In production, replace with actual Whisper API call
-            resolve("I couldn't quite catch that, but I'll do my best to help.");
-          }, 1000);
+          // If no transcript, use the audio blob with an alternative method
+          processAudioBlobFallback(audioBlob)
+            .then(resolve)
+            .catch(reject);
         }
       };
       
@@ -123,9 +115,47 @@ export const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
       recognition.start();
     } catch (error) {
       console.error("Error during speech recognition:", error);
-      reject(error);
+      // Try fallback method
+      processAudioBlobFallback(audioBlob)
+        .then(resolve)
+        .catch(reject);
     }
   });
+};
+
+// Fallback method for processing audio when SpeechRecognition fails
+const processAudioBlobFallback = async (audioBlob: Blob): Promise<string> => {
+  try {
+    // In a real implementation, you would send the audio to a transcription API like Whisper
+    // For now, we'll create an audio element to let the user know we received their audio
+    const audioURL = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioURL);
+    
+    // Log that we're trying to process the audio
+    console.log("Using fallback audio processing method");
+    
+    // If we had an OpenAI Whisper API key, this is where we'd use it
+    // const formData = new FormData();
+    // formData.append('file', audioBlob, 'recording.webm');
+    // formData.append('model', 'whisper-1');
+    
+    // const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Authorization': `Bearer ${OPENAI_API_KEY}`
+    //   },
+    //   body: formData
+    // });
+    
+    // const data = await response.json();
+    // return data.text;
+    
+    // For now, return a placeholder message
+    return "I heard your voice but couldn't transcribe it with the browser's capabilities. For better results, try speaking clearly or typing your question.";
+  } catch (error) {
+    console.error("Error in fallback audio processing:", error);
+    throw new Error("Could not process audio recording");
+  }
 };
 
 export const startAudioRecording = async (): Promise<MediaRecorder> => {
