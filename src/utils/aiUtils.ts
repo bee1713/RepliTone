@@ -27,12 +27,16 @@ export const processUserMessage = async (
     let finalHistory = updatedHistory;
     
     try {
+      // This API key would normally be stored in a backend environment
+      // IMPORTANT: For production, move this to a secure backend service
+      const API_KEY = "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";
+      
       // Call OpenAI API
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY || 'sk-your-key-here'}`
+          'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
@@ -62,9 +66,9 @@ export const processUserMessage = async (
       // If API key is missing or invalid, use a specific message
       if (typeof error === 'object' && error && 'message' in error && 
           (error.message as string).includes('API key')) {
-        aiResponse = "I need an OpenAI API key to work properly. Please add your API key in the .env file as VITE_OPENAI_API_KEY.";
+        aiResponse = "There was an issue with the OpenAI API key. Please check the console for error details.";
       } else {
-        aiResponse = "I'm having trouble connecting to my brain right now. Please check the console for error details and verify your API key is set correctly.";
+        aiResponse = "I'm having trouble connecting to my brain right now. Please check the console for error details.";
       }
       
       // Still add this error response to the conversation history
