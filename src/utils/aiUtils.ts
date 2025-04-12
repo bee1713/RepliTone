@@ -1,11 +1,12 @@
 
-import { generateVoiceResponse } from './audioUtils';
-
 export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
+// This function would normally be in a secure backend
+// For demo purposes, we're implementing it in the frontend
+// In production, NEVER expose your API key in frontend code
 export const processUserMessage = async (
   userText: string, 
   conversationHistory: Message[], 
@@ -15,42 +16,54 @@ export const processUserMessage = async (
     console.log("Processing user message:", userText);
     
     // Add user message to history
-    const updatedHistory = [
+    const updatedHistory: Message[] = [
       ...conversationHistory,
       { role: "user", content: userText }
     ];
     
-    // In a real application, make API call to OpenAI
-    /*
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: updatedHistory,
-        temperature: 0.7,
-        max_tokens: 150
-      })
-    });
+    // For demo purposes, simulate an OpenAI call
+    // In production, this would be an actual API call to OpenAI
+    // with proper authentication
+    let aiResponse = "";
+    let finalHistory = updatedHistory;
     
-    const result = await response.json();
-    const aiResponse = result.choices[0].message.content;
-    */
-    
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Generate appropriate response based on input
-    const aiResponse = generateSimulatedResponse(userText);
-    
-    // Add AI response to history
-    const finalHistory = [
-      ...updatedHistory,
-      { role: "assistant", content: aiResponse }
-    ];
+    try {
+      // Uncomment this in production with proper API key handling
+      // const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${API_KEY}`
+      //   },
+      //   body: JSON.stringify({
+      //     model: 'gpt-4o-mini',
+      //     messages: updatedHistory,
+      //     temperature: 0.7,
+      //     max_tokens: 150
+      //   })
+      // });
+      // 
+      // const result = await response.json();
+      // aiResponse = result.choices[0].message.content;
+      
+      // For demo, use simulated responses based on input
+      aiResponse = generateSimulatedResponse(userText);
+      
+      // Add AI response to history
+      finalHistory = [
+        ...updatedHistory,
+        { role: "assistant", content: aiResponse }
+      ];
+    } catch (error) {
+      console.error("Error calling OpenAI API:", error);
+      aiResponse = "I'm having trouble connecting to my brain right now. Please try again in a moment.";
+      
+      // Still add this error response to the conversation history
+      finalHistory = [
+        ...updatedHistory,
+        { role: "assistant", content: aiResponse }
+      ];
+    }
     
     // Generate audio for the response
     const audioUrl = await generateVoiceResponse(aiResponse, voiceId);
@@ -102,7 +115,7 @@ export const getInitialConversationHistory = (): Message[] => {
   return [
     { 
       role: "system", 
-      content: "You are a helpful AI assistant with a friendly, conversational style. Respond directly to questions and provide thoughtful answers. Never repeat the same response twice."
+      content: "You are a smart, natural-sounding AI assistant who answers questions in a helpful and conversational way. You respond only to the user's actual question or statement, and always stay on topic. Do not repeat preset or irrelevant messages. Always answer with real and specific information based on the user's input."
     }
   ];
 };

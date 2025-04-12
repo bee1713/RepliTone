@@ -45,6 +45,22 @@ export const useVoiceChat = (initialVoiceId?: string) => {
     setVoiceId(initialVoiceId);
   }, [initialVoiceId]);
 
+  // Pre-load voices for speech synthesis
+  useEffect(() => {
+    // Force voices to load
+    speechSynthesis.getVoices();
+    
+    // Set up a listener for when voices are loaded
+    speechSynthesis.onvoiceschanged = () => {
+      console.log("Voices loaded:", speechSynthesis.getVoices().length);
+    };
+    
+    return () => {
+      // Clean up
+      speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   const startRecording = async () => {
     try {
       const recorder = await startAudioRecording();
@@ -143,7 +159,7 @@ export const useVoiceChat = (initialVoiceId?: string) => {
       // Auto-play the response if there's audio
       if (audioUrl) {
         setTimeout(() => {
-          playMessage(aiMessage.id, audioUrl);
+          playMessage(aiMessage.id);
         }, 300);
       }
     } catch (error) {
@@ -158,57 +174,65 @@ export const useVoiceChat = (initialVoiceId?: string) => {
     }
   };
 
-  const playMessage = (messageId: string, audioUrl?: string) => {
-    if (!audioUrl) {
+  const playMessage = (messageId: string) => {
+    try {
       const message = messages.find(m => m.id === messageId);
       if (!message?.audioUrl) {
         console.error("No audio URL found for message:", messageId);
         return;
       }
-      audioUrl = message.audioUrl;
-    }
-    
-    // Stop any currently playing audio
-    if (isPlaying) {
-      const currentAudio = audioElements[isPlaying];
-      if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-      }
-    }
-    
-    // Play the new audio
-    let audio = audioElements[messageId];
-    if (!audio) {
-      audio = new Audio(audioUrl);
       
-      // Add error handler for audio
-      audio.onerror = (error) => {
-        console.error("Error playing audio:", error);
-        toast({
-          title: "Audio Playback Error",
-          description: "Could not play audio response.",
-          variant: "destructive"
-        });
+      // Stop any currently playing audio
+      if (isPlaying) {
+        const currentAudio = audioElements[isPlaying];
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+        }
+      }
+      
+      // Play the new audio
+      let audio = audioElements[messageId];
+      if (!audio) {
+        audio = new Audio(message.audioUrl);
+        
+        // Add error handler for audio
+        audio.onerror = (error) => {
+          console.error("Error playing audio:", error);
+          toast({
+            title: "Audio Playback Error",
+            description: "Could not play audio response.",
+            variant: "destructive"
+          });
+          setIsPlaying(null);
+        };
+        
+        setAudioElements(prev => ({
+          ...prev,
+          [messageId]: audio
+        }));
+      }
+      
+      setIsPlaying(messageId);
+      
+      audio.onended = () => {
         setIsPlaying(null);
       };
       
-      setAudioElements(prev => ({
-        ...prev,
-        [messageId]: audio
-      }));
+      // Play the audio and handle any errors
+      audio.play().catch(error => {
+        console.error("Error playing audio:", error);
+        toast({
+          title: "Audio Playback Error",
+          description: "Could not play the audio response. Please try again.",
+          variant: "destructive"
+        });
+        setIsPlaying(null);
+      });
+    } catch (error) {
+      console.error("Error in playMessage:", error);
+      setIsPlaying(null);
     }
-    
-    setIsPlaying(messageId);
-    
-    audio.onended = () => {
-      setIsPlaying(null);
-    };
-    
-    audio.play().catch(error => {
-      console.error("Error playing audio:", error);
-      setIsPlaying(null);
-    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {

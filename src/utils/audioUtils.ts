@@ -3,7 +3,6 @@ export const generateVoiceResponse = async (text: string, voiceId?: string): Pro
   console.log("Generating voice response for:", text);
   console.log("Using voice ID:", voiceId);
   
-  // In a real implementation with ElevenLabs API
   try {
     if (!voiceId) {
       // Fallback to browser's speech synthesis if no voice ID
@@ -68,11 +67,58 @@ const generateBrowserSpeech = (text: string, voiceId?: string): Promise<string> 
 };
 
 export const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
-  // In a real app, use OpenAI's Whisper API or another speech-to-text service
-  // For demo, prompt the user (this would be replaced with actual API call)
-  return new Promise((resolve) => {
-    const userInput = prompt("What did you say? (Simulating speech recognition)", "");
-    resolve(userInput || "");
+  return new Promise((resolve, reject) => {
+    try {
+      // Use SpeechRecognition API for real-time transcription
+      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        throw new Error("Speech recognition not supported in this browser");
+      }
+      
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      
+      let transcriptResult = "";
+      
+      recognition.onresult = (event) => {
+        transcriptResult = event.results[0][0].transcript;
+        console.log("Recognized text:", transcriptResult);
+      };
+      
+      recognition.onerror = (event) => {
+        console.error("Recognition error:", event.error);
+        reject(new Error(`Speech recognition error: ${event.error}`));
+      };
+      
+      recognition.onend = () => {
+        if (transcriptResult) {
+          resolve(transcriptResult);
+        } else {
+          // Fallback to URL-based audio (e.g., from a blob)
+          const audioURL = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioURL);
+          
+          // Just let the user know we're processing
+          console.log("Processing audio...");
+          
+          // In a real implementation, you would send this audio to Whisper API
+          // For now, we'll use a simulated response after a short delay
+          setTimeout(() => {
+            // In production, replace with actual Whisper API call
+            resolve("I couldn't quite catch that, but I'll do my best to help.");
+          }, 1000);
+        }
+      };
+      
+      // Start recognition
+      recognition.start();
+    } catch (error) {
+      console.error("Error during speech recognition:", error);
+      reject(error);
+    }
   });
 };
 
@@ -90,15 +136,17 @@ export const startAudioRecording = async (): Promise<MediaRecorder> => {
 export const stopAudioRecording = (
   mediaRecorder: MediaRecorder, 
   onStop: (blob: Blob) => void
-) => {
+): void => {
   if (!mediaRecorder) return;
   
   const chunks: Blob[] = [];
   
   // Ensure we have the ondataavailable handler
   const originalDataHandler = mediaRecorder.ondataavailable;
-  mediaRecorder.ondataavailable = (e) => {
-    if (originalDataHandler) originalDataHandler(e);
+  mediaRecorder.ondataavailable = function(e) {
+    if (originalDataHandler) {
+      originalDataHandler.call(this, e);
+    }
     if (e.data.size > 0) {
       chunks.push(e.data);
     }
@@ -106,8 +154,10 @@ export const stopAudioRecording = (
   
   // Set up the onstop handler
   const originalStopHandler = mediaRecorder.onstop;
-  mediaRecorder.onstop = () => {
-    if (originalStopHandler) originalStopHandler();
+  mediaRecorder.onstop = function() {
+    if (originalStopHandler) {
+      originalStopHandler.call(this);
+    }
     
     // Stop all audio tracks
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
