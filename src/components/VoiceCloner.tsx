@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import VoiceRecorder from "./VoiceRecorder";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface VoiceClonerProps {
   onVoiceCloned: (voiceId: string) => void;
@@ -33,10 +33,8 @@ const VoiceCloner: React.FC<VoiceClonerProps> = ({ onVoiceCloned }) => {
 
     setIsCloning(true);
 
-    // In a real implementation, you would:
-    // 1. Upload the audio to your server or directly to voice cloning API
-    // 2. Call the voice cloning API (ElevenLabs, etc.)
-    // 3. Get back a voice ID or model reference
+    // In a real implementation, you would upload the audio to ElevenLabs API
+    // For simulation, we'll generate a mock voice ID
     
     // Simulating API call with timeout
     setTimeout(() => {
@@ -56,7 +54,7 @@ const VoiceCloner: React.FC<VoiceClonerProps> = ({ onVoiceCloned }) => {
   };
 
   return (
-    <Card>
+    <Card className="dark:border-gray-800">
       <CardHeader>
         <CardTitle>Voice Cloning</CardTitle>
         <CardDescription>
