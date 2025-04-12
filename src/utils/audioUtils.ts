@@ -1,3 +1,8 @@
+// Define types for Web Speech API to fix TypeScript errors
+interface Window {
+  SpeechRecognition: any;
+  webkitSpeechRecognition: any;
+}
 
 export const generateVoiceResponse = async (text: string, voiceId?: string): Promise<string> => {
   console.log("Generating voice response for:", text);
@@ -70,7 +75,8 @@ export const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
       // Use SpeechRecognition API for real-time transcription
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || 
+                               (window as any).webkitSpeechRecognition;
       
       if (!SpeechRecognition) {
         throw new Error("Speech recognition not supported in this browser");
@@ -83,12 +89,12 @@ export const recognizeSpeech = async (audioBlob: Blob): Promise<string> => {
       
       let transcriptResult = "";
       
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: any) => {
         transcriptResult = event.results[0][0].transcript;
         console.log("Recognized text:", transcriptResult);
       };
       
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: any) => {
         console.error("Recognition error:", event.error);
         reject(new Error(`Speech recognition error: ${event.error}`));
       };

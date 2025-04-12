@@ -1,3 +1,4 @@
+import { generateVoiceResponse } from './audioUtils';
 
 export interface Message {
   role: 'system' | 'user' | 'assistant';
